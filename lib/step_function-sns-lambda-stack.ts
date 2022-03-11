@@ -37,10 +37,45 @@ export class StepFunctionSnsLambdaStack extends Stack {
         REGION: 'us-east-1',
       }
     });
+    // INVOCATION lambda if vote is OPEN
+    const invokeDb = new LambdaInvoke(this, 'state vote open', {
+      lambdaFunction: fn, 
+      //integrationPattern: sfn.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+      // payload: sfn.TaskInput.fromObject({
+      //   token: sfn.JsonPath.taskToken,
+      // }),    
+      outputPath: '$',
+     });
+
+
+
+     // Lambda for update state vote db
+    const updateStateVoteDb = new aws_lambda_nodejs.NodejsFunction(this,"updateStateVoteDb",{
+      runtime: aws_lambda.Runtime.NODEJS_14_X,      
+      entry: 'lambda/updateStateVoteDb.ts',
+      handler: 'updateStateVoteDb', 
+      environment: {
+        SNS_TOPIC_ARN: topic.topicArn,
+        REGION: 'us-east-1',
+      }
+    });
+    // INVOCATION lambda for update state vote db
+    const invokeUpdate = new LambdaInvoke(this, 'update state vote db', {
+      lambdaFunction: updateStateVoteDb,     
+      inputPath: '$',    
+      outputPath: '$',
+     });
+
+     const definition = invokeDb.next(invokeUpdate);
 
     topic.grantPublish(fn);
 
-    
+    //Create the statemachine
+    new StateMachine(this, "StateMachine", {
+      definition,
+      stateMachineName: 'publishSns-StateMachine',
+      timeout: Duration.minutes(1)
+    });
     
 
   
