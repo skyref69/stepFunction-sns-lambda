@@ -1,6 +1,5 @@
 export const updateStateVoteDb = async(event: any) => { 
-
-    console.table(event.Payload);
-    
+    console.log('STATEVOTE = OPEN ==> UPDATE DB');
+    console.table(event);    
     return event;
 };

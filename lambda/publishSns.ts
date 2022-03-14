@@ -1,16 +1,19 @@
 import {SNSClient, PublishCommand} from "@aws-sdk/client-sns";
 
-export const publishSns = async(event: any) => {  
-    
-  console.log(event);
+interface IstateVote {
+  stateVote: string,
+}
 
-    const sns = new SNSClient('$.process.env.AWS_DEFAULT_REGION');    
-    const publishCommand = new PublishCommand({
-        Message: `Sent message test`,        
-        TopicArn: process.env.SNS_TOPIC_ARN,
-      });    
+export const publishSns = async(event: IstateVote) => {
+  const sns = new SNSClient('$.process.env.AWS_DEFAULT_REGION');    
+  const publishCommand = new PublishCommand({
+    Message: event.stateVote,        
+    TopicArn: process.env.SNS_TOPIC_ARN,
+  });
+  try {
     await sns.send(publishCommand);
-    console.log('---> ' + process.env.AWS_SESSION_TOKEN);
-    return process.env.AWS_SESSION_TOKEN;
-};
- 
+    console.log('Write into SNS');    
+  } catch (error) {
+    console.log('Error write into SNS');    
+  }
+}; 
