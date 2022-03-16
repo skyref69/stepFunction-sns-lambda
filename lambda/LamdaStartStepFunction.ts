@@ -35,8 +35,7 @@ export const LambdaStartStepFunction = (event: IstateVote) => {
             if (err) console.log(err, err.stack); 
             else     console.log('Send task success');  
         });        
-    }
-        
+    }        
     
 };
 
