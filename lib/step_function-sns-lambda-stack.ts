@@ -1,16 +1,9 @@
 import { aws_iam, aws_lambda, aws_lambda_nodejs, CfnOutput, Duration, Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as sns from 'aws-cdk-lib/aws-sns';
-import * as sqs from 'aws-cdk-lib/aws-sqs';
-import { EvaluateExpression, LambdaInvoke, SnsPublish } from 'aws-cdk-lib/aws-stepfunctions-tasks';
+import { LambdaInvoke } from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as sfn from '@aws-cdk/aws-stepfunctions';
-import { Choice, StateMachine, Wait, WaitTime } from 'aws-cdk-lib/aws-stepfunctions';
-import { Subscription, Topic } from 'aws-cdk-lib/aws-sns';
-import { LambdaSubscription, SqsSubscription } from 'aws-cdk-lib/aws-sns-subscriptions';
-import * as cdk from '@aws-cdk/core';
-import { IAM } from 'aws-sdk';
-
-
+import { StateMachine, Wait, WaitTime } from 'aws-cdk-lib/aws-stepfunctions';
+import { Topic } from 'aws-cdk-lib/aws-sns';
 export class StepFunctionSnsLambdaStack extends Stack {
 
   public Machine: sfn.StateMachine;
@@ -20,8 +13,7 @@ export class StepFunctionSnsLambdaStack extends Stack {
     
     // ------------------------------------------------------------
     // ---------------- STEP FUNCTION SECTION ---------------------
-    // ------------------------------------------------------------
-  
+    // ------------------------------------------------------------  
     
     // Create an SNS Topic
     const topic = new Topic(this, 'Topic777');
@@ -59,11 +51,20 @@ export class StepFunctionSnsLambdaStack extends Stack {
       timeout: Duration.seconds(3),
     });
     // INVOCATION lambda for update state vote db
-    const invokeUpdateDb = new LambdaInvoke(this, 'update state vote db', {
-      lambdaFunction: updateStateVoteDb,     
-      inputPath: '$',    
-      outputPath: '$',
-    });
+    const invokeUpdateDb = new LambdaInvoke(
+      this, 
+      'update state vote db',
+      {
+        lambdaFunction: updateStateVoteDb,
+        payload: sfn.TaskInput.fromObject({
+          token: sfn.JsonPath.taskToken,
+          request: sfn.JsonPath.entirePayload,     
+        }),
+        integrationPattern: sfn.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+        timeout: Duration.minutes(4),
+        resultPath: '$.lambda',
+      }
+    );
     //_______________________________________________________________________________________
 
   
@@ -79,7 +80,7 @@ export class StepFunctionSnsLambdaStack extends Stack {
     const stepFunction = new StateMachine(this, "StateMachine", {
       definition,
       stateMachineName: 'publishSns-StateMachine',
-      timeout: Duration.minutes(1)
+      timeout: Duration.minutes(5)
     });  
     
     // ------------------------------------------------------------
@@ -92,13 +93,23 @@ export class StepFunctionSnsLambdaStack extends Stack {
       entry: 'lambda/LamdaStartStepFunction.ts',
       handler: 'LambdaStartStepFunction',       
       timeout: Duration.seconds(3),
-    })    
-    const lambdaStartStepFunctionAddRole = lambdaStartStepFunction.addToRolePolicy(new aws_iam.PolicyStatement({
+    })   
+    
+    // 
+    lambdaStartStepFunction.addToRolePolicy(new aws_iam.PolicyStatement({      
       actions: ['states:StartExecution'],
       effect: aws_iam.Effect.ALLOW,
       resources: [stepFunction.stateMachineArn]
     }))
 
+    lambdaStartStepFunction.addToRolePolicy(new aws_iam.PolicyStatement({      
+      actions: ['states:SendTaskSuccess'],
+      effect: aws_iam.Effect.ALLOW,
+      resources: [stepFunction.stateMachineArn]
+    }))
+
+    
+    
   }
 }
 
